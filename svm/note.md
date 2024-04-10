@@ -116,5 +116,84 @@ $$
 
 这说明，由对偶问题解出的 $\bm{\alpha}$ 代入模型即可求出超平面方程的 $\bm{w}$。
 
+由 KKT 条件可以看出，对于任何样本都有 $\alpha_i=0$ 或 $y_if(\bm{x}_i)=1$。若 $\alpha_i=0$，则对 $f(\bm{x})$ 没有影响，说明不是支持向量。相反，若 $\alpha_i>0$，必有 $y_if(\bm{x}_i)=1$，所对应的样本是一个支持向量。这说明，**训练完成后，大部分训练样本都不重要，最终模型仅与支持向量有关。**
+
+因此，在接下来求解 $\bm{\alpha}$ 的过程中，我们只需要考虑约束 $\sum_{i=1}^m\alpha_iy_i=0$ 和条件 $\alpha_i \ge 0$。
+
 ### SMO 算法
+
+为了方便查看，我再贴一次需要解决的对偶问题：
+$$
+\begin{aligned}
+& \max_{\bm{\alpha}} \sum_{i=1}^m\alpha_i - \frac{1}{2} \sum_{i=1}^m\sum_{j=1}^m \alpha_i\alpha_jy_iy_j\bm{x}^T_i\bm{x}_j \\
+& \text{s.t.} \quad \sum_{i=1}^m\alpha_iy_i=0, \qquad \alpha_i \ge 0, \quad i=1,2,...,m.
+\end{aligned}
+$$
+
+为了求解上面的对偶问题，SMO (Sequential Minimal Optimization) 算法是一个不错的选择。它相比于通用的二次规划算法更加高效。
+
+SMO 算法的基本思路是先选取一个 $\alpha_i$，然后固定其他参数。但是考虑到约束 $\sum_{i=1}^m\alpha_iy_i=0$，在更新 $\alpha_i$ 的同时，需要同时更新另外一个 $\alpha_j$，才能满足约束。也就是在更新的过程中需要满足：
+$$
+c = -\sum_{k \neq i,j} \alpha_ky_k \\
+\alpha_iy_i+\alpha_jy_j=c, \quad \alpha_i\ge0, \quad \alpha_j\ge0
+$$
+
+因此算法的思路大概为：
+- 选取一对需要更新的变量 $\alpha_i$ 和 $\alpha_j$；
+- 固定除 $\alpha_i$ 和 $\alpha_j$ 以外的参数，求解基本型获得更新后的 $\alpha_i$ 和 $\alpha_j$。
+
+用 $\alpha_iy_i+\alpha_jy_j=c$ 消去基本型的 $\alpha_j$，可以得到一个关于 $\alpha_i$ 的单变量二次规划问题，唯一的约束为 $\alpha_i\ge0$。我们可以根据二次函数的性质轻易算出更新后的 $\alpha_i$，而不需要优化算法。
+
+另外 SMO 采用了一种启发式：使选取的两个变量对应的样本之间的间隔最大。对它们进行更新会带给目标函数值最大的变化。
+
+### 核函数
+
+在之前，我们假设训练样本是线性可分的。但是在现实任务中，仅仅一个超平面或许并不能很好地将样本正确分类。我们可以将样本**映射到高维空间**，然后再进行分类。
+
+![](https://upload.wikimedia.org/wikipedia/commons/1/1b/Kernel_Machine.png)
+*图片来源：wikipedia.org*
+
+我们可以使用一个函数 $\phi(\bm{x})$ 对样本进行映射。代入到基本型可以得到：
+$$
+\max_{\bm{\alpha}} \sum_{i=1}^m\alpha_i - \frac{1}{2} \sum_{i=1}^m\sum_{j=1}^m \alpha_i\alpha_jy_iy_j\phi(\bm{x}_i)^T\phi(\bm{x}_j),
+$$
+约束略。
+
+由于 $\bm{x}$ 再映射到高维后维数可能会很高，不方便计算内积，所以我们可以设想一个新函数：
+$$
+\kappa(\bm{x}_i,\bm{x}_j) = \phi(\bm{x}_i)^T\phi(\bm{x}_j).
+$$
+
+对偶问题变为：
+$$
+\max_{\bm{\alpha}} \sum_{i=1}^m\alpha_i - \frac{1}{2} \sum_{i=1}^m\sum_{j=1}^m \alpha_i\alpha_jy_iy_j\kappa(\bm{x}_i,\bm{x}_j),
+$$
+约束略。
+
+求解后可以得到：
+$$
+\begin{aligned}
+f(\bm{x}) & =\bm{w}^T\phi(\bm{x})+b \\
+& =\sum_{i=1}^m \alpha_iy_i\kappa(\bm{x}_i,\bm{x}_j)+b.
+\end{aligned}
+$$
+
+那么，什么样的函数能做核函数呢？
+
+**只要一个矩阵所对应的核矩阵半正定，它就能作为核函数使用。**
+
+下面列举几种常用核函数：
+
+| 名称       | 表达式                                                   | 参数                      |
+| ---------- | ------------------------------------------------------- | ------------------------ |
+| 线性核     | $\bm{x}_i^T\bm{x}_j$                                     |                          |
+| 多项式核   | $(\bm{x}_i^T\bm{x}_j)^d$                                 | $d\ge1$ 为多项式的次数    |
+| 高斯核     | $\exp(-\frac{\Vert\bm{x}_i-\bm{x}_j\Vert^2}{2\sigma^2})$ | $\sigma>0$ 为高斯核的带宽 |
+| 拉普拉斯核  | $\exp(-\frac{\Vert\bm{x}_i-\bm{x}_j\Vert}{\sigma})$     | $\sigma>0$               |
+| Sigmoid 核 | $\tanh(\beta\bm{x}_i^T\bm{x}_j+\theta)$                 | $\beta>0,\theta<0$       |
+
+此外还可以通过函数组合：
+- 核函数 $\kappa_1,\kappa_2$ 的线性组合 $\gamma_1\kappa_1 + \gamma_2\kappa_2, \quad (\gamma_1,\gamma_2>0)$ 也是核函数；
+- 核函数 $\kappa_1,\kappa_2$ 的直积 $\kappa_1 \bigotimes \kappa_2$ 也是核函数；
+- 对于任意函数 $g(\bm{x})$，$g(\bm{x})\kappa(\bm{x},\bm{z})g(\bm{z})$ 也是核函数。
 
