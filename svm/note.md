@@ -197,3 +197,76 @@ $$
 - 核函数 $\kappa_1,\kappa_2$ 的直积 $\kappa_1 \bigotimes \kappa_2$ 也是核函数；
 - 对于任意函数 $g(\bm{x})$，$g(\bm{x})\kappa(\bm{x},\bm{z})g(\bm{z})$ 也是核函数。
 
+### 软间隔
+
+在之前，我们总是假设划分超平面能完美地将样本分类，但是在实际任务中这几乎是不可能的。因此，我们需要允许一些错误。为此，我们需要一个“**软间隔**”的概念。
+
+软间隔允许一些样本不满足约束，但不满足约束的样本应该尽可能少。于是我们的优化目标可以是：
+$$
+\min_{\bm{w},b} \frac{1}{2}\Vert\bm{w}\Vert^2 + C\sum_{i=1}^m l_{0/1}(y_i(\bm{w}^T\bm{x}+b)-1).
+$$
+
+其中 $C>0$ 是对样本的 “严苛度”，$l_{0/1}$ 是“0/1损失函数”
+$$
+l_{0/1}=
+\left\{
+    \begin{aligned}
+    & 1, \quad \text{if } z<0; \\
+    & 0, \quad \text{otherwise.}
+    \end{aligned}
+\right.
+$$
+
+但由于它非凸，非连续，我们有几种常用的损失函数替代：
+$$
+\begin{aligned}
+& \text{hinge 损失: } \qquad l_{hinge}(z) = \max(0,1-z); \\
+& \text{指数损失: } \qquad l_{exp}(z) = \exp(-z); \\
+& \text{对率损失: } \qquad l_{log}(z) = \log(1+\exp(-z)).
+\end{aligned}
+$$
+
+优化目标一般的形式为：
+$$
+\min_{\bm{w},b} \frac{1}{2}\Vert\bm{w}\Vert^2 + C\sum_{i=1}^m l(f(\bm{x}_i,y_i)).
+$$
+
+引入“松弛变量”：
+$$
+\begin{aligned}
+\min_{\bm{w},b,\xi_i} & \frac{1}{2}\Vert\bm{w}\Vert^2 + C\sum_{i=1}^m \xi_i \\
+\text{s.t.} \quad & y_i(\bm{w}^T\bm{x}_i+b) \ge 1-\xi_i, \\
+& \xi_i \ge 0, \quad i=1,2,...,m.
+\end{aligned}
+$$
+
+这就是软间隔 SVM 的基本型。
+
+其对偶问题为：
+$$
+\begin{aligned}
+\max_{\bm{\alpha}} \quad & \sum_{i=1}^m \alpha_i - \frac{1}{2}\sum_{i=1}^m\sum_{j=1}^m \alpha_i\alpha_jy_iy_j\bm{x}_i^T\bm{x}_j \\
+\text{s.t.} \quad & \sum_{i=1}^m\alpha_iy_i=0, \\
+& 0 \le \alpha_i \le C, \quad i=1,2,...,m.
+\end{aligned}
+$$
+
+我们发现比起硬间隔 SVM，软间隔仅仅多了一个 $\alpha_i \le C$。
+
+其 KKT 条件：
+$$
+\left\{
+    \begin{aligned}
+    & \alpha_i \ge 0, \quad \mu_i \ge 0, \\
+    & y_if(\bm{x}_i)-1 + \xi_i \ge 0, \\
+    & \alpha_i(y_if(\bm{x}_i)-1 + \xi_i)=0, \\
+    & \xi_i \ge 0, \quad \mu_i\xi_i = 0.
+    \end{aligned}
+\right.
+$$
+
+其中，若 $\alpha=0$，样本对 $f(\bm{x})$ 没有影响。若 $\alpha_i<C$，则 $\mu_i>0$，进而 $\xi_i=0$，即该样本正好在最大间隔边界上。若 $\alpha_i=C$，则 $\mu_i=0$，此时若 $\xi_i \le 1$，样本落于最大间隔内部；若 $\xi_i>1$，样本被错误分类。
+
+可以看出，软间隔 SVM 的最终模型也仅于支持向量有关。
+
+但是，对于像对率损失这样的损失函数，不像 hinge 损失有一块“平坦”的零区域，因此**无法导出类似支持向量的概念**。因此对率回归的解依赖于更多训练样本，预测开销更大。
